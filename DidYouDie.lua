@@ -522,6 +522,7 @@ end)
 -- Reset-Defaults-Button Logik
 resetLinesButton:SetScript("OnClick", function()
     DidYouDieDB.disabledDefaults = {}
+    DidYouDieDB.customLines = {}
     RefreshList()
 end)
 
