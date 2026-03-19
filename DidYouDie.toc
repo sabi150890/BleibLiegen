@@ -1,8 +1,8 @@
 ## Interface: 120001
-## Title: BleibLiegen
+## Title: DidYouDie
 ## Notes: Zeigt eine Nachricht und zählt deine Tode.
 ## Author: Biene
 ## Version: 1.1
-## SavedVariables: BleibLiegenDB
+## SavedVariables: DidYouDieDB
 
-BleibLiegen.lua
+DidYouDie.lua
