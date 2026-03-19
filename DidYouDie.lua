@@ -1,10 +1,10 @@
 -- 1. Datenbank & Hauptvariablen
 local function InitializeDB()
-    if not BleibLiegenDB then
-        BleibLiegenDB = { count = 0, unlockKey = 1 }
+    if not DidYouDieDB then
+        DidYouDieDB = { count = 0, unlockKey = 1 }
     end
-    if not BleibLiegenDB.unlockKey then
-        BleibLiegenDB.unlockKey = 1
+    if not DidYouDieDB.unlockKey then
+        DidYouDieDB.unlockKey = 1
     end
 end
 
@@ -14,7 +14,7 @@ end
 local FRAME_W = 800
 local FRAME_H = 180
 
-local deathFrame = CreateFrame("Frame", "BleibLiegenDeathFrame", UIParent)
+local deathFrame = CreateFrame("Frame", "DidYouDieDeathFrame", UIParent)
 deathFrame:SetSize(FRAME_W, FRAME_H)
 deathFrame:SetFrameStrata("TOOLTIP")
 deathFrame:Hide()
@@ -197,20 +197,20 @@ end)
 -- -------------------------------------------------------
 -- 4. Options-Panel & Reset
 -- -------------------------------------------------------
-local panel = CreateFrame("Frame", "BleibLiegenOptionsPanel", UIParent)
-panel.name = "BleibLiegen"
+local panel = CreateFrame("Frame", "DidYouDieOptionsPanel", UIParent)
+panel.name = "DidYouDie"
 
 -- Titel
 local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("BleibLiegen Einstellungen")
+title:SetText("DidYouDie Einstellungen")
 
 -- Todesanzahl
 local statText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 statText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -20)
 
 local function UpdateMenuText()
-    local count = (BleibLiegenDB and BleibLiegenDB.count) or 0
+    local count = (DidYouDieDB and DidYouDieDB.count) or 0
     statText:SetText("Gesamtanzahl der Tode: |cFFFF0000" .. count .. "|r")
 end
 
@@ -220,7 +220,7 @@ resetButton:SetPoint("TOPLEFT", statText, "BOTTOMLEFT", 0, -12)
 resetButton:SetText("Zähler zurücksetzen")
 resetButton:SetSize(160, 25)
 resetButton:SetScript("OnClick", function()
-    BleibLiegenDB.count = 0
+    DidYouDieDB.count = 0
     UpdateMenuText()
 end)
 
@@ -240,7 +240,7 @@ end
 
 local prevAnchor = keyHeader
 for i, option in ipairs(KEY_OPTIONS) do
-    local rb = CreateFrame("CheckButton", "BleibLiegenKey" .. i, panel, "UIRadioButtonTemplate")
+    local rb = CreateFrame("CheckButton", "DidYouDieKey" .. i, panel, "UIRadioButtonTemplate")
     rb:SetPoint("TOPLEFT", prevAnchor, "BOTTOMLEFT", 0, -8)
     rb.value = i
 
@@ -251,7 +251,7 @@ for i, option in ipairs(KEY_OPTIONS) do
 
     rb:SetScript("OnClick", function(self)
         selectedKeyIndex        = self.value
-        BleibLiegenDB.unlockKey = selectedKeyIndex
+        DidYouDieDB.unlockKey = selectedKeyIndex
         UpdateRadioButtons()
     end)
 
@@ -272,15 +272,15 @@ frame:RegisterEvent("PLAYER_ALIVE")
 frame:RegisterEvent("PLAYER_UNGHOST")
 
 frame:SetScript("OnEvent", function(self, event, arg1)
-    if event == "ADDON_LOADED" and arg1 == "BleibLiegen" then
+    if event == "ADDON_LOADED" and arg1 == "DidYouDie" then
         InitializeDB()
-        selectedKeyIndex = BleibLiegenDB.unlockKey or 1
+        selectedKeyIndex = DidYouDieDB.unlockKey or 1
         UpdateRadioButtons()
         UpdateMenuText()
 
     elseif event == "PLAYER_DEAD" then
-        BleibLiegenDB.count = (BleibLiegenDB.count or 0) + 1
-        deathText:SetText("Bleib liegen du Pfosten!  (Tod Nr. " .. BleibLiegenDB.count .. ")")
+        DidYouDieDB.count = (DidYouDieDB.count or 0) + 1
+        deathText:SetText("Bleib liegen du Pfosten!  (Tod Nr. " .. DidYouDieDB.count .. ")")
         tauntText:SetText(TAUNT_LINES[math.random(#TAUNT_LINES)])
         InitBounce()
         deathFrame:Show()
