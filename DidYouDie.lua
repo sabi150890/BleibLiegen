@@ -239,38 +239,37 @@ end
 local languageHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 languageHeader:SetPoint("TOPLEFT", prevAnchor, "BOTTOMLEFT", 0, -16)
 
-local localeRadioButtons = {}
-local selectedLocaleIndex = 1
+local localeDropdown = CreateFrame("Frame", "DidYouDieLocaleDropdown", panel, "UIDropDownMenuTemplate")
+localeDropdown:SetPoint("TOPLEFT", languageHeader, "BOTTOMLEFT", -15, -4)
+UIDropDownMenu_SetWidth(localeDropdown, 140)
 
-local function UpdateLocaleRadioButtons()
-    for i, rb in ipairs(localeRadioButtons) do
-        rb:SetChecked(i == selectedLocaleIndex)
+local function UpdateLocaleDropdown()
+    local activeCode = (DidYouDieDB and DidYouDieDB.locale) or GetActiveLocale()
+    for _, loc in ipairs(SUPPORTED_LOCALES) do
+        if loc.code == activeCode then
+            UIDropDownMenu_SetText(localeDropdown, loc.label)
+            return
+        end
     end
 end
 
-local localePrevAnchor = languageHeader
-for i, loc in ipairs(SUPPORTED_LOCALES) do
-    local rb = CreateFrame("CheckButton", "DidYouDieLocale" .. i, panel, "UIRadioButtonTemplate")
-    rb:SetPoint("TOPLEFT", localePrevAnchor, "BOTTOMLEFT", 0, -6)
-    rb.value = i
+UIDropDownMenu_Initialize(localeDropdown, function(self, level)
+    for _, loc in ipairs(SUPPORTED_LOCALES) do
+        local info    = UIDropDownMenu_CreateInfo()
+        info.text     = loc.label
+        info.value    = loc.code
+        info.checked  = DidYouDieDB and (DidYouDieDB.locale == loc.code)
+        info.func     = function(btn)
+            DidYouDieDB.locale           = btn.value
+            DidYouDieDB.disabledDefaults = {}
+            ApplyLocale(btn.value)
+            CloseDropDownMenus()
+        end
+        UIDropDownMenu_AddButton(info)
+    end
+end)
 
-    local lbl = rb:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    lbl:SetPoint("LEFT", rb, "RIGHT", 4, 0)
-    lbl:SetText(loc.label)  -- language names are self-describing, not translated
-
-    rb:SetScript("OnClick", function(self)
-        selectedLocaleIndex           = self.value
-        DidYouDieDB.locale            = SUPPORTED_LOCALES[self.value].code
-        DidYouDieDB.disabledDefaults  = {}  -- reset: indices differ between locales
-        ApplyLocale(DidYouDieDB.locale)
-        UpdateLocaleRadioButtons()
-    end)
-
-    localeRadioButtons[i] = rb
-    localePrevAnchor = rb
-end
-
-prevAnchor = localePrevAnchor
+prevAnchor = localeDropdown
 
 -- -------------------------------------------------------
 -- Spruch-Liste
@@ -646,6 +645,7 @@ LocalizeUI = function()
         lbl:SetText(L[KEY_LABEL_KEYS[i]] or "")
     end
     languageHeader:SetText(L.languageHeader or "Language:")
+    UpdateLocaleDropdown()
     listHeader:SetText(L.linesHeader or "")
     resetLinesButton:SetText(L.resetAll or "")
     addButton:SetText(L.addButton or "")
@@ -673,14 +673,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         UpdateRadioButtons()
 
         local activeCode = GetActiveLocale()
-        for i, loc in ipairs(SUPPORTED_LOCALES) do
-            if loc.code == activeCode then
-                selectedLocaleIndex = i
-                break
-            end
-        end
-        UpdateLocaleRadioButtons()
-        ApplyLocale(activeCode)  -- sets L, currentTauntLines, calls LocalizeUI
+        ApplyLocale(activeCode)  -- sets L, currentTauntLines, calls LocalizeUI (which calls UpdateLocaleDropdown)
 
     elseif event == "PLAYER_DEAD" then
         sessionDeathCount = sessionDeathCount + 1
