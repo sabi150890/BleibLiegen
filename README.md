@@ -52,9 +52,11 @@ Open **ESC → Settings → Addons → DidYouDie** to:
 
 | Setting | Description |
 |---|---|
-| **Death counter** | Shows your total death count across all sessions |
-| **Reset counter** | Resets the death count back to zero |
+| **Death counter** | Shows your total death count across this session |
 | **Unlock key** | Choose which key unlocks the Release Spirit button (Shift / Ctrl / Alt / None) |
+| **Language** | Choose your preferred Langauge English or German |
+| **Default Taunt Lines** | Disable or Enable your default taunt lines or make a custom selection |
+| **Custom Taunt Lines** | Just add your favorite custom taunt lines into your game! |
 
 
 ---
