@@ -1,70 +1,43 @@
 -- DidYouDie.lua
 -- -------------------------------------------------------
--- 1. Datenbank & Hauptvariablen
+-- 1. Locale system
 -- -------------------------------------------------------
-local DEFAULT_TAUNT_LINES = {
-    -- Klassiker
-    "Na keinen CD gezogen?",
-    "Skill issue.",
-    "Touch grass, dann touch Wiederbelebung.",
-    "Der Boden ist dein Freund jetzt.",
-    "GG EZ.",
-    "Hast du den Raidboss um Erlaubnis gefragt?",
-    "Dein Heiler weint gerade.",
-    "Wenigstens stirbst du konsistent.",
-    "Schon wieder? Respekt für die Ausdauer.",
-    "Der Friedhof kennt deinen Namen auswendig.",
-    "Vielleicht hilft ein neues Talent-Build.",
-    "Das nächste Mal einfach nicht sterben.",
-    -- Heiler-Witze
-    "Dein Heiler war gerade AFK. Natürlich.",
-    "Healer: 'Ich hab geheilt!' Du: *tot*",
-    "Schon mal überlegt, Heiler zu spielen? Ach nein, die sterben ja auch.",
-    "Der Heiler hat dich gesehen. Er hat sich entschieden.",
-    "Laut Heiler war das deine Schuld.",
-    "Der Heiler postet gerade deinen Tod im Gildenchat.",
-    -- Tank-Witze
-    "Der Tank fragt: 'Wer hat Aggro?' Antwort: der Boden.",
-    "Taunt ist keine Beleidigung, sondern eine Fähigkeit. Benutze sie.",
-    "Der Tank dreht sich um: 'Alle da?' Nein.",
-    "Vielleicht hättest du den Boss nicht angetanzt.",
-    -- DPS-Witze
-    "Laut Skada warst du auf Platz 1. Kurz.",
-    "Die Schadensanzeige zeigt 0. Weil tot.",
-    "Stand in der Fläche UND hat trotzdem nicht voll DPS gemacht.",
-    "Meter pushen bis zum Tod. Respekt für die Hingabe.",
-    -- Klassische WoW-Momente
-    "Leeroy Jenkins hätte das genauso gemacht.",
-    "Wenigstens hast du nicht den ganzen Raid mitgerissen. Diesmal.",
-    "Das war bestimmt ein Lags.",
-    "Diese Fläche war nicht in der Raidführung erwähnt. Oder doch?",
-    "Haben wir heute schon den Spiritheiler umarmt? Ja, haben wir.",
-    "Du hast den Mechanismus gecheckt. Der Mechanismus hat zurückgecheckt.",
-    "Die Bosse respektieren Hartnäckigkeit. Leider auch deine.",
-    "Willkommen in der Graveyard-Perspektive.",
-    "Schritt 1: Nicht in die Fläche stehen. Schritt 2: existiert nicht mehr.",
-    "Feuer am Boden ist immer schlecht. Immer.",
-    "Der Raidleiter nimmt tief Luft.",
-    "Irgendwo weint gerade ein Classic-Spieler für dich.",
-    "Der Spiritheiler sagt: 'Schon wieder du.'",
-    "Nicht der MVP. Nicht mal der MIP. Einfach tot.",
-    "Voll repariert rein, gebrochen raus.",
-    "Deine Ausrüstung ist jetzt auf 0 Haltbarkeit. Gut gemacht.",
-    "One shot? One shot.",
-    "Der Boss hat nicht mal eine Zwischensequenz gespielt. Du warst so unwichtig.",
-    "Laut Warcraftlogs war das 100% vermeidbar.",
-    "Haben wir den Enrage schon? Nein, nur du bist tot.",
-    "Der Raidleiter öffnet gerade Warcraftlogs.",
-    "Die Heiler haben mich ignoriert!",
-    "Einfach mal stark sein!",
-    "Einfach mal stärker sein.",
-    "Einfach Todesstoß drücken.",
-    "Mach doch mal die Augen auf.",
-    "Schon wieder?",
-}
-
+local L                = {}   -- active UI strings
+local currentTauntLines = {}  -- active taunt lines
+local LocalizeUI              -- forward declared; defined after all UI widgets exist
 local sessionDeathCount = 0
 
+local SUPPORTED_LOCALES = {
+    { code = "deDE", label = "Deutsch" },
+    { code = "enUS", label = "English" },
+}
+
+local function GetActiveLocale()
+    local saved = DidYouDieDB and DidYouDieDB.locale
+    if saved then
+        for _, loc in ipairs(SUPPORTED_LOCALES) do
+            if loc.code == saved then return saved end
+        end
+    end
+    local client = GetLocale()
+    for _, loc in ipairs(SUPPORTED_LOCALES) do
+        if loc.code == client then return client end
+    end
+    return "enUS"
+end
+
+local function ApplyLocale(code)
+    local data = DidYouDieLocales and DidYouDieLocales[code]
+    if not data then data = DidYouDieLocales and DidYouDieLocales["enUS"] end
+    if not data then return end
+    L = data.ui
+    currentTauntLines = data.tauntLines
+    if LocalizeUI then LocalizeUI() end
+end
+
+-- -------------------------------------------------------
+-- 2. Datenbank & Hauptvariablen
+-- -------------------------------------------------------
 local function InitializeDB()
     if not DidYouDieDB then
         DidYouDieDB = {}
@@ -72,14 +45,16 @@ local function InitializeDB()
     if not DidYouDieDB.unlockKey then
         DidYouDieDB.unlockKey = 1
     end
-    -- customLines: array of strings added by user
     if not DidYouDieDB.customLines then
         DidYouDieDB.customLines = {}
     end
-    -- disabledDefaults: set of indices (1-based) into DEFAULT_TAUNT_LINES that are disabled
     if not DidYouDieDB.disabledDefaults then
         DidYouDieDB.disabledDefaults = {}
     end
+    if not DidYouDieDB.sessionCount then
+        DidYouDieDB.sessionCount = 0
+    end
+    -- locale: nil = auto-detect from client
 end
 
 -- -------------------------------------------------------
@@ -87,7 +62,7 @@ end
 -- -------------------------------------------------------
 local function BuildActiveLines()
     local lines = {}
-    for i, line in ipairs(DEFAULT_TAUNT_LINES) do
+    for i, line in ipairs(currentTauntLines) do
         if not DidYouDieDB.disabledDefaults[i] then
             lines[#lines + 1] = line
         end
@@ -99,7 +74,7 @@ local function BuildActiveLines()
 end
 
 -- -------------------------------------------------------
--- 2. Das visuelle Warn-Element
+-- 3. Das visuelle Warn-Element
 -- -------------------------------------------------------
 local FRAME_W = 800
 local FRAME_H = 180
@@ -171,13 +146,13 @@ alphaIn:SetDuration(0.4); alphaIn:SetOrder(2); alphaIn:SetSmoothing("IN_OUT")
 animationGroup:SetLooping("REPEAT")
 
 -- -------------------------------------------------------
--- 3. Die "Geist freilassen" Sperre (konfigurierbare Taste)
+-- 4. Die "Geist freilassen" Sperre (konfigurierbare Taste)
 -- -------------------------------------------------------
 local KEY_OPTIONS = {
-    { label = "Shift", check = IsShiftKeyDown               },
-    { label = "Strg",  check = IsControlKeyDown             },
-    { label = "Alt",   check = IsAltKeyDown                 },
-    { label = "Keine", check = function() return true end   },
+    { check = IsShiftKeyDown             },
+    { check = IsControlKeyDown           },
+    { check = IsAltKeyDown               },
+    { check = function() return true end },
 }
 
 local selectedKeyIndex = 1
@@ -186,8 +161,10 @@ local function IsUnlockKeyDown()
     return KEY_OPTIONS[selectedKeyIndex].check()
 end
 
+local KEY_LABEL_KEYS = { "keyShift", "keyCtrl", "keyAlt", "keyNone" }
+
 local function GetUnlockKeyLabel()
-    return KEY_OPTIONS[selectedKeyIndex].label
+    return L[KEY_LABEL_KEYS[selectedKeyIndex]] or ""
 end
 
 local function LockDeathButton()
@@ -195,10 +172,10 @@ local function LockDeathButton()
     if button and button:IsVisible() and StaticPopup1.which == "DEATH" then
         if IsUnlockKeyDown() then
             button:Enable()
-            button:SetText("JETZT FREILASSEN")
+            button:SetText(L.releaseNow or "RELEASE!")
         else
             button:Disable()
-            button:SetText(GetUnlockKeyLabel() .. " HALTEN!")
+            button:SetText(GetUnlockKeyLabel() .. (L.holdKey or " HOLD!"))
         end
     end
 end
@@ -211,30 +188,27 @@ lockFrame:SetScript("OnUpdate", function(self, elapsed)
 end)
 
 -- -------------------------------------------------------
--- 4. Options-Panel
+-- 5. Options-Panel
 -- -------------------------------------------------------
 local panel = CreateFrame("Frame", "DidYouDieOptionsPanel", UIParent)
 panel.name = "DidYouDie"
 
--- Titel
 local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("DidYouDie Einstellungen")
 
--- Todesanzahl
 local statText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 statText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
 
 local function UpdateMenuText()
-    statText:SetText("Tode in dieser Sitzung: |cFFFF0000" .. sessionDeathCount .. "|r")
+    statText:SetText((L.sessionDeaths or "Deaths: ") .. "|cFFFF0000" .. sessionDeathCount .. "|r")
 end
 
--- Abschnitt: Tastenauswahl
+-- Tastenauswahl
 local keyHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 keyHeader:SetPoint("TOPLEFT", statText, "BOTTOMLEFT", 0, -16)
-keyHeader:SetText("Taste zum Freischalten des Geist-Buttons:")
 
 local radioButtons = {}
+local keyLabels    = {}
 
 local function UpdateRadioButtons()
     for i, rb in ipairs(radioButtons) do
@@ -250,10 +224,10 @@ for i, option in ipairs(KEY_OPTIONS) do
 
     local lbl = rb:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     lbl:SetPoint("LEFT", rb, "RIGHT", 4, 0)
-    lbl:SetText(option.label)
+    keyLabels[i] = lbl
 
     rb:SetScript("OnClick", function(self)
-        selectedKeyIndex        = self.value
+        selectedKeyIndex      = self.value
         DidYouDieDB.unlockKey = selectedKeyIndex
         UpdateRadioButtons()
     end)
@@ -263,57 +237,87 @@ for i, option in ipairs(KEY_OPTIONS) do
 end
 
 -- -------------------------------------------------------
+-- Sprachauswahl
+-- -------------------------------------------------------
+local languageHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+languageHeader:SetPoint("TOPLEFT", prevAnchor, "BOTTOMLEFT", 0, -16)
+
+local localeDropdown = CreateFrame("Frame", "DidYouDieLocaleDropdown", panel, "UIDropDownMenuTemplate")
+localeDropdown:SetPoint("TOPLEFT", languageHeader, "BOTTOMLEFT", -15, -4)
+UIDropDownMenu_SetWidth(localeDropdown, 140)
+
+local function UpdateLocaleDropdown()
+    local activeCode = (DidYouDieDB and DidYouDieDB.locale) or GetActiveLocale()
+    for _, loc in ipairs(SUPPORTED_LOCALES) do
+        if loc.code == activeCode then
+            UIDropDownMenu_SetText(localeDropdown, loc.label)
+            return
+        end
+    end
+end
+
+UIDropDownMenu_Initialize(localeDropdown, function(self, level)
+    for _, loc in ipairs(SUPPORTED_LOCALES) do
+        local info    = UIDropDownMenu_CreateInfo()
+        info.text     = loc.label
+        info.value    = loc.code
+        info.checked  = DidYouDieDB and (DidYouDieDB.locale == loc.code)
+        info.func     = function(btn)
+            DidYouDieDB.locale           = btn.value
+            DidYouDieDB.disabledDefaults = {}
+            ApplyLocale(btn.value)
+            CloseDropDownMenus()
+        end
+        UIDropDownMenu_AddButton(info)
+    end
+end)
+
+prevAnchor = localeDropdown
+
+-- -------------------------------------------------------
 -- Spruch-Liste
 -- -------------------------------------------------------
 local listHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 listHeader:SetPoint("TOPLEFT", prevAnchor, "BOTTOMLEFT", 0, -20)
-listHeader:SetText("Sprüche:")
 
--- "Reset to Default"-Button (rechts vom Header)
 local resetLinesButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 resetLinesButton:SetPoint("LEFT", listHeader, "RIGHT", 12, 0)
-resetLinesButton:SetText("Alles zurücksetzen")
 resetLinesButton:SetSize(150, 22)
 
--- Toggle-All-Button: alle Defaults an/aus
 local toggleAllButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 toggleAllButton:SetPoint("LEFT", resetLinesButton, "RIGHT", 6, 0)
 toggleAllButton:SetSize(150, 22)
 
 local function UpdateToggleAllButton()
     local allDisabled = true
-    for i = 1, #DEFAULT_TAUNT_LINES do
+    for i = 1, #currentTauntLines do
         if not DidYouDieDB.disabledDefaults[i] then
             allDisabled = false
             break
         end
     end
-    toggleAllButton:SetText(allDisabled and "Alle aktivieren" or "Alle deaktivieren")
+    toggleAllButton:SetText(allDisabled and (L.enableAll or "Enable all") or (L.disableAll or "Disable all"))
 end
-
--- toggleAllButton OnClick wird nach RefreshList gesetzt (siehe unten)
 
 -- -------------------------------------------------------
 -- Tab-Leiste: Default | Custom
 -- -------------------------------------------------------
-local activeTab = "default"  -- "default" oder "custom"
+local activeTab = "default"
 
 local tabRow = CreateFrame("Frame", nil, panel)
 tabRow:SetPoint("TOPLEFT", listHeader, "BOTTOMLEFT", 0, -8)
 tabRow:SetSize(560, 28)
 
--- Eigene Tab-Buttons (kein Blizzard-Template nötig)
-local function MakeTabButton(label, parent)
+local function MakeTabButton(parent)
     local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     btn:SetSize(100, 24)
-    btn:SetText(label)
     return btn
 end
 
-local tabDefault = MakeTabButton("Default", tabRow)
+local tabDefault = MakeTabButton(tabRow)
 tabDefault:SetPoint("BOTTOMLEFT", tabRow, "BOTTOMLEFT", 0, 0)
 
-local tabCustom = MakeTabButton("Custom", tabRow)
+local tabCustom = MakeTabButton(tabRow)
 tabCustom:SetPoint("LEFT", tabDefault, "RIGHT", 4, 0)
 
 local function UpdateTabs()
@@ -326,7 +330,6 @@ local function UpdateTabs()
     end
 end
 
--- Eingabezeile (nur im Custom-Tab sichtbar)
 local addBox = CreateFrame("EditBox", "DidYouDieAddBox", panel, "InputBoxTemplate")
 addBox:SetPoint("TOPLEFT", tabRow, "BOTTOMLEFT", 2, -6)
 addBox:SetSize(340, 22)
@@ -335,31 +338,27 @@ addBox:SetMaxLetters(200)
 
 local addButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 addButton:SetPoint("LEFT", addBox, "RIGHT", 6, 0)
-addButton:SetText("Hinzufügen")
 addButton:SetSize(100, 22)
 
 -- -------------------------------------------------------
 -- ScrollFrame für die Spruch-Liste
 -- -------------------------------------------------------
-local SCROLL_HEIGHT = 260
+local SCROLL_HEIGHT = 185
 local ROW_HEIGHT    = 22
 
--- Header-Leiste über der Liste: Listenname links, Toggle-All rechts
 local listHeaderBar = CreateFrame("Frame", nil, panel)
 listHeaderBar:SetPoint("TOPLEFT", addBox, "BOTTOMLEFT", 0, -8)
 listHeaderBar:SetSize(552, 20)
 
 local listNameText = listHeaderBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 listNameText:SetPoint("LEFT", listHeaderBar, "LEFT", 2, 0)
-listNameText:SetTextColor(1, 0.82, 0, 1)  -- WoW-Gold
+listNameText:SetTextColor(1, 0.82, 0, 1)
 
--- Toggle-All direkt in der Header-Leiste, rechtsbündig
 toggleAllButton:SetParent(listHeaderBar)
 toggleAllButton:ClearAllPoints()
 toggleAllButton:SetPoint("RIGHT", listHeaderBar, "RIGHT", 0, 0)
 toggleAllButton:SetSize(130, 18)
 
--- Hintergrund-Container
 local listBg = CreateFrame("Frame", nil, panel, "InsetFrameTemplate")
 listBg:SetPoint("TOPLEFT", listHeaderBar, "BOTTOMLEFT", -4, -4)
 listBg:SetSize(556, SCROLL_HEIGHT + 8)
@@ -369,10 +368,9 @@ scrollFrame:SetPoint("TOPLEFT", listHeaderBar, "BOTTOMLEFT", 2, -8)
 scrollFrame:SetSize(516, SCROLL_HEIGHT)
 
 local scrollChild = CreateFrame("Frame", "DidYouDieScrollChild", scrollFrame)
-scrollChild:SetSize(500, 1)   -- Höhe wird dynamisch gesetzt
+scrollChild:SetSize(500, 1)
 scrollFrame:SetScrollChild(scrollChild)
 
--- Zebra-Hintergrundfarben für Zeilen
 local function SetRowBg(row, rowIndex, disabled)
     if not row.bg then
         row.bg = row:CreateTexture(nil, "BACKGROUND")
@@ -387,7 +385,6 @@ local function SetRowBg(row, rowIndex, disabled)
     end
 end
 
--- Pool für Zeilen-Widgets
 local rowPool = {}
 
 local function GetOrCreateRow(index)
@@ -395,26 +392,22 @@ local function GetOrCreateRow(index)
         local row = CreateFrame("Frame", nil, scrollChild)
         row:SetSize(498, ROW_HEIGHT)
 
-        -- Toggle-Button: Icon-only, kein UIPanelButtonTemplate-Rahmen
         local toggle = CreateFrame("Button", nil, row)
         toggle:SetSize(20, 20)
         toggle:SetPoint("LEFT", row, "LEFT", 4, 0)
 
-        -- Icon-Textur für aktiv (grüner Haken)
         local iconEnabled = toggle:CreateTexture(nil, "ARTWORK")
         iconEnabled:SetAllPoints()
         iconEnabled:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
         iconEnabled:SetVertexColor(0.2, 1.0, 0.2, 1)
         toggle.iconEnabled = iconEnabled
 
-        -- Icon-Textur für deaktiviert (rotes X)
         local iconDisabled = toggle:CreateTexture(nil, "ARTWORK")
         iconDisabled:SetAllPoints()
         iconDisabled:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
         iconDisabled:SetVertexColor(1.0, 0.25, 0.25, 1)
         toggle.iconDisabled = iconDisabled
 
-        -- Hover-Highlight
         local hl = toggle:CreateTexture(nil, "HIGHLIGHT")
         hl:SetAllPoints()
         hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
@@ -423,14 +416,12 @@ local function GetOrCreateRow(index)
 
         row.toggle = toggle
 
-        -- Trennlinie unten
         local sep = row:CreateTexture(nil, "BORDER")
         sep:SetHeight(1)
         sep:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
         sep:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
         sep:SetColorTexture(1, 1, 1, 0.06)
 
-        -- Spruch-Text
         local text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         text:SetPoint("LEFT", toggle, "RIGHT", 6, 0)
         text:SetPoint("RIGHT", row, "RIGHT", 26, 0)
@@ -438,7 +429,6 @@ local function GetOrCreateRow(index)
         text:SetWordWrap(false)
         row.text = text
 
-        -- Löschen-Button (nur Custom): kleines rotes X rechts
         local del = CreateFrame("Button", nil, row)
         del:SetSize(18, 18)
         del:SetPoint("RIGHT", row, "RIGHT", -2, 0)
@@ -460,7 +450,6 @@ local function GetOrCreateRow(index)
     return rowPool[index]
 end
 
--- Hilfsfunktion: Toggle-Icons umschalten
 local function SetToggleState(toggle, enabled)
     if enabled then
         toggle.iconEnabled:Show()
@@ -471,38 +460,36 @@ local function SetToggleState(toggle, enabled)
     end
 end
 
--- Forward-Declare RefreshList so callbacks can call it
 local RefreshList
 
 RefreshList = function()
-    -- Listentitel und Toggle-All sichtbarkeit
     if activeTab == "default" then
-        listNameText:SetText("Standard-Sprüche")
+        listNameText:SetText(L.listDefault or "")
         toggleAllButton:Show()
     else
-        listNameText:SetText("Eigene Sprüche")
+        listNameText:SetText(L.listCustom or "")
         toggleAllButton:Hide()
     end
 
-    -- Tab-Label mit Anzahl aktualisieren
     local customCount = #DidYouDieDB.customLines
-    tabCustom:SetText(customCount > 0 and ("Custom (" .. customCount .. ")") or "Custom")
+    local tabCustomLabel = L.tabCustom or "Custom"
+    tabCustom:SetText(customCount > 0 and (tabCustomLabel .. " (" .. customCount .. ")") or tabCustomLabel)
+
     local disabledCount = 0
     for _ in pairs(DidYouDieDB.disabledDefaults) do disabledCount = disabledCount + 1 end
+    local tabDefaultLabel = L.tabDefault or "Default"
     local defaultLabel = disabledCount > 0
-        and ("Default (" .. (#DEFAULT_TAUNT_LINES - disabledCount) .. "/" .. #DEFAULT_TAUNT_LINES .. ")")
-        or  ("Default (" .. #DEFAULT_TAUNT_LINES .. ")")
+        and (tabDefaultLabel .. " (" .. (#currentTauntLines - disabledCount) .. "/" .. #currentTauntLines .. ")")
+        or  (tabDefaultLabel .. " (" .. #currentTauntLines .. ")")
     tabDefault:SetText(defaultLabel)
     UpdateTabs()
 
-    -- AddBox nur im Custom-Tab
     if activeTab == "custom" then
         addBox:Show(); addButton:Show()
     else
         addBox:Hide(); addButton:Hide()
     end
 
-    -- Verstecke alle alten Rows
     for _, row in ipairs(rowPool) do
         row:Hide()
     end
@@ -511,8 +498,7 @@ RefreshList = function()
     local rowIndex = 0
 
     if activeTab == "default" then
-        -- Default-Sprüche
-        for i, line in ipairs(DEFAULT_TAUNT_LINES) do
+        for i, line in ipairs(currentTauntLines) do
             rowIndex = rowIndex + 1
             local row = GetOrCreateRow(rowIndex)
             row:ClearAllPoints()
@@ -549,9 +535,7 @@ RefreshList = function()
         end
 
     else
-        -- Custom-Sprüche
         if #DidYouDieDB.customLines == 0 then
-            -- Leere-Liste-Hinweis
             rowIndex = rowIndex + 1
             local row = GetOrCreateRow(rowIndex)
             row:ClearAllPoints()
@@ -559,7 +543,7 @@ RefreshList = function()
             row:Show()
             SetRowBg(row, 1, false)
             row.toggle:Hide()
-            row.text:SetText("|cFF888888Noch keine eigenen Sprüche. Füge welche hinzu!|r")
+            row.text:SetText("|cFF888888" .. (L.noCustomLines or "") .. "|r")
             row.text:SetPoint("LEFT", row, "LEFT", 8, 0)
             row.del:Hide()
             y = y + ROW_HEIGHT
@@ -607,10 +591,9 @@ tabCustom:SetScript("OnClick", function()
     RefreshList()
 end)
 
--- Toggle-All OnClick (hier, weil RefreshList erst ab hier verfügbar)
 toggleAllButton:SetScript("OnClick", function()
     local allDisabled = true
-    for i = 1, #DEFAULT_TAUNT_LINES do
+    for i = 1, #currentTauntLines do
         if not DidYouDieDB.disabledDefaults[i] then
             allDisabled = false
             break
@@ -619,7 +602,7 @@ toggleAllButton:SetScript("OnClick", function()
     if allDisabled then
         DidYouDieDB.disabledDefaults = {}
     else
-        for i = 1, #DEFAULT_TAUNT_LINES do
+        for i = 1, #currentTauntLines do
             DidYouDieDB.disabledDefaults[i] = true
         end
     end
@@ -627,61 +610,92 @@ toggleAllButton:SetScript("OnClick", function()
     RefreshList()
 end)
 
--- Hinzufügen-Button Logik
 addButton:SetScript("OnClick", function()
     local txt = addBox:GetText()
-    if txt and txt:match("%S") then  -- nicht nur Whitespace
-        txt = txt:match("^%s*(.-)%s*$")  -- trim
+    if txt and txt:match("%S") then
+        txt = txt:match("^%s*(.-)%s*$")
         table.insert(DidYouDieDB.customLines, txt)
         addBox:SetText("")
         RefreshList()
     end
 end)
 
--- Enter in der EditBox = Hinzufügen
 addBox:SetScript("OnEnterPressed", function(self)
     addButton:Click()
     self:ClearFocus()
 end)
 
--- Reset-Defaults-Button Logik
 resetLinesButton:SetScript("OnClick", function()
     DidYouDieDB.disabledDefaults = {}
     DidYouDieDB.customLines = {}
     RefreshList()
 end)
 
--- Panel wird geöffnet → Liste neu aufbauen
 panel:SetScript("OnShow", function()
     UpdateMenuText()
     UpdateToggleAllButton()
     RefreshList()
 end)
 
+-- -------------------------------------------------------
+-- LocalizeUI: update all static widget texts
+-- Called by ApplyLocale() whenever the language changes
+-- -------------------------------------------------------
+LocalizeUI = function()
+    title:SetText(L.panelTitle or "DidYouDie")
+    keyHeader:SetText(L.unlockKeyHeader or "")
+    for i, lbl in ipairs(keyLabels) do
+        lbl:SetText(L[KEY_LABEL_KEYS[i]] or "")
+    end
+    languageHeader:SetText(L.languageHeader or "Language:")
+    UpdateLocaleDropdown()
+    listHeader:SetText(L.linesHeader or "")
+    resetLinesButton:SetText(L.resetAll or "")
+    addButton:SetText(L.addButton or "")
+    UpdateMenuText()
+    UpdateToggleAllButton()
+    RefreshList()
+end
+
 local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
 Settings.RegisterAddOnCategory(category)
 
 -- -------------------------------------------------------
--- 5. Event-Handler
+-- 6. Event-Handler
 -- -------------------------------------------------------
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
+frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("PLAYER_DEAD")
 frame:RegisterEvent("PLAYER_ALIVE")
 frame:RegisterEvent("PLAYER_UNGHOST")
 
-frame:SetScript("OnEvent", function(self, event, arg1)
+frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "ADDON_LOADED" and arg1 == "DidYouDie" then
         InitializeDB()
         selectedKeyIndex = DidYouDieDB.unlockKey or 1
         UpdateRadioButtons()
-        UpdateMenuText()
+
+        -- Restore saved count; PLAYER_ENTERING_WORLD will reset it if this is a real login
+        sessionDeathCount = DidYouDieDB.sessionCount
+        local activeCode = GetActiveLocale()
+        ApplyLocale(activeCode)  -- sets L, currentTauntLines, calls LocalizeUI (which calls UpdateLocaleDropdown)
+
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- arg1 = isInitialLogin (true on fresh login/char switch), arg2 = isReloadingUi (true on /reload)
+        -- Only reset on real login, not on /reload or zone changes
+        if arg1 then
+            sessionDeathCount = 0
+            DidYouDieDB.sessionCount = 0
+            UpdateMenuText()
+        end
 
     elseif event == "PLAYER_DEAD" then
         sessionDeathCount = sessionDeathCount + 1
-        deathText:SetText("Bleib liegen du Pfosten!  (Tod Nr. " .. sessionDeathCount .. ")")
+        DidYouDieDB.sessionCount = sessionDeathCount
+        deathText:SetText((L.deathMessage or "You died!") .. "  (" .. (L.deathNr or "#") .. sessionDeathCount .. ")")
         local activeLines = BuildActiveLines()
-        tauntText:SetText(#activeLines > 0 and activeLines[math.random(#activeLines)] or "Füge eigene Sprüche hinzu oder aktiviere Standard-Sprüche!")
+        tauntText:SetText(#activeLines > 0 and activeLines[math.random(#activeLines)] or (L.noActiveLines or ""))
         InitBounce()
         deathFrame:Show()
         animationGroup:Play()
