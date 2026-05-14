@@ -15,7 +15,6 @@ Because dying should hurt a little extra.
 - 🔒 **Release Spirit lock** — the "Release Spirit" button is disabled until you hold your chosen modifier key
 - ⚙️ **Configurable unlock key** — choose between Shift, Ctrl, Alt, or None in the addon settings
 - 📊 **Persistent death counter** — tracks your total deaths across sessions, visible in the settings panel
-- 🔁 **Reset button** — wipe your death count when the shame becomes too much
 
 ---
 
