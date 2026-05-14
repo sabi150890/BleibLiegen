@@ -665,10 +665,10 @@ Settings.RegisterAddOnCategory(category)
 -- -------------------------------------------------------
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
+frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_DEAD")
 frame:RegisterEvent("PLAYER_ALIVE")
 frame:RegisterEvent("PLAYER_UNGHOST")
-frame:RegisterEvent("PLAYER_LOGOUT")
 
 frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "DidYouDie" then
@@ -676,9 +676,16 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         selectedKeyIndex = DidYouDieDB.unlockKey or 1
         UpdateRadioButtons()
 
+        -- Restore count so /reload preserves it; PLAYER_LOGIN will reset it on a real login
         sessionDeathCount = DidYouDieDB.sessionCount
         local activeCode = GetActiveLocale()
         ApplyLocale(activeCode)  -- sets L, currentTauntLines, calls LocalizeUI (which calls UpdateLocaleDropdown)
+
+    elseif event == "PLAYER_LOGIN" then
+        -- Fires on real login/character switch but NOT on /reload
+        sessionDeathCount = 0
+        DidYouDieDB.sessionCount = 0
+        UpdateMenuText()
 
     elseif event == "PLAYER_DEAD" then
         sessionDeathCount = sessionDeathCount + 1
@@ -696,8 +703,5 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             animationGroup:Stop()
             deathFrame:Hide()
         end
-
-    elseif event == "PLAYER_LOGOUT" then
-        DidYouDieDB.sessionCount = 0
     end
 end)
