@@ -51,6 +51,9 @@ local function InitializeDB()
     if not DidYouDieDB.disabledDefaults then
         DidYouDieDB.disabledDefaults = {}
     end
+    if not DidYouDieDB.sessionCount then
+        DidYouDieDB.sessionCount = 0
+    end
     -- locale: nil = auto-detect from client
 end
 
@@ -665,6 +668,7 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_DEAD")
 frame:RegisterEvent("PLAYER_ALIVE")
 frame:RegisterEvent("PLAYER_UNGHOST")
+frame:RegisterEvent("PLAYER_LOGOUT")
 
 frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "DidYouDie" then
@@ -672,11 +676,13 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         selectedKeyIndex = DidYouDieDB.unlockKey or 1
         UpdateRadioButtons()
 
+        sessionDeathCount = DidYouDieDB.sessionCount
         local activeCode = GetActiveLocale()
         ApplyLocale(activeCode)  -- sets L, currentTauntLines, calls LocalizeUI (which calls UpdateLocaleDropdown)
 
     elseif event == "PLAYER_DEAD" then
         sessionDeathCount = sessionDeathCount + 1
+        DidYouDieDB.sessionCount = sessionDeathCount
         deathText:SetText((L.deathMessage or "You died!") .. "  (" .. (L.deathNr or "#") .. sessionDeathCount .. ")")
         local activeLines = BuildActiveLines()
         tauntText:SetText(#activeLines > 0 and activeLines[math.random(#activeLines)] or (L.noActiveLines or ""))
@@ -690,5 +696,8 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             animationGroup:Stop()
             deathFrame:Hide()
         end
+
+    elseif event == "PLAYER_LOGOUT" then
+        DidYouDieDB.sessionCount = 0
     end
 end)
