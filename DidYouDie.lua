@@ -63,12 +63,11 @@ local DEFAULT_TAUNT_LINES = {
     "Schon wieder?",
 }
 
+local sessionDeathCount = 0
+
 local function InitializeDB()
     if not DidYouDieDB then
         DidYouDieDB = {}
-    end
-    if not DidYouDieDB.count then
-        DidYouDieDB.count = 0
     end
     if not DidYouDieDB.unlockKey then
         DidYouDieDB.unlockKey = 1
@@ -227,23 +226,12 @@ local statText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 statText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
 
 local function UpdateMenuText()
-    local count = (DidYouDieDB and DidYouDieDB.count) or 0
-    statText:SetText("Gesamtanzahl der Tode: |cFFFF0000" .. count .. "|r")
+    statText:SetText("Tode in dieser Sitzung: |cFFFF0000" .. sessionDeathCount .. "|r")
 end
-
--- Reset-Button (Zähler)
-local resetButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-resetButton:SetPoint("TOPLEFT", statText, "BOTTOMLEFT", 0, -8)
-resetButton:SetText("Zähler zurücksetzen")
-resetButton:SetSize(160, 25)
-resetButton:SetScript("OnClick", function()
-    DidYouDieDB.count = 0
-    UpdateMenuText()
-end)
 
 -- Abschnitt: Tastenauswahl
 local keyHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-keyHeader:SetPoint("TOPLEFT", resetButton, "BOTTOMLEFT", 0, -16)
+keyHeader:SetPoint("TOPLEFT", statText, "BOTTOMLEFT", 0, -16)
 keyHeader:SetText("Taste zum Freischalten des Geist-Buttons:")
 
 local radioButtons = {}
@@ -690,8 +678,8 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         UpdateMenuText()
 
     elseif event == "PLAYER_DEAD" then
-        DidYouDieDB.count = (DidYouDieDB.count or 0) + 1
-        deathText:SetText("Bleib liegen du Pfosten!  (Tod Nr. " .. DidYouDieDB.count .. ")")
+        sessionDeathCount = sessionDeathCount + 1
+        deathText:SetText("Bleib liegen du Pfosten!  (Tod Nr. " .. sessionDeathCount .. ")")
         local activeLines = BuildActiveLines()
         tauntText:SetText(#activeLines > 0 and activeLines[math.random(#activeLines)] or "Füge eigene Sprüche hinzu oder aktiviere Standard-Sprüche!")
         InitBounce()
