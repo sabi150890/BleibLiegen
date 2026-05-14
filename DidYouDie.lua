@@ -341,7 +341,7 @@ addButton:SetSize(100, 22)
 -- -------------------------------------------------------
 -- ScrollFrame für die Spruch-Liste
 -- -------------------------------------------------------
-local SCROLL_HEIGHT = 260
+local SCROLL_HEIGHT = 185
 local ROW_HEIGHT    = 22
 
 local listHeaderBar = CreateFrame("Frame", nil, panel)
