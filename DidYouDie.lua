@@ -665,27 +665,30 @@ Settings.RegisterAddOnCategory(category)
 -- -------------------------------------------------------
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("PLAYER_LOGIN")
+frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("PLAYER_DEAD")
 frame:RegisterEvent("PLAYER_ALIVE")
 frame:RegisterEvent("PLAYER_UNGHOST")
 
-frame:SetScript("OnEvent", function(self, event, arg1)
+frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "ADDON_LOADED" and arg1 == "DidYouDie" then
         InitializeDB()
         selectedKeyIndex = DidYouDieDB.unlockKey or 1
         UpdateRadioButtons()
 
-        -- Restore count so /reload preserves it; PLAYER_LOGIN will reset it on a real login
+        -- Restore saved count; PLAYER_ENTERING_WORLD will reset it if this is a real login
         sessionDeathCount = DidYouDieDB.sessionCount
         local activeCode = GetActiveLocale()
         ApplyLocale(activeCode)  -- sets L, currentTauntLines, calls LocalizeUI (which calls UpdateLocaleDropdown)
 
-    elseif event == "PLAYER_LOGIN" then
-        -- Fires on real login/character switch but NOT on /reload
-        sessionDeathCount = 0
-        DidYouDieDB.sessionCount = 0
-        UpdateMenuText()
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- arg1 = isInitialLogin (true on fresh login/char switch), arg2 = isReloadingUi (true on /reload)
+        -- Only reset on real login, not on /reload or zone changes
+        if arg1 then
+            sessionDeathCount = 0
+            DidYouDieDB.sessionCount = 0
+            UpdateMenuText()
+        end
 
     elseif event == "PLAYER_DEAD" then
         sessionDeathCount = sessionDeathCount + 1
