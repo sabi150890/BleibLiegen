@@ -5,6 +5,7 @@
 local L                = {}   -- active UI strings
 local currentTauntLines = {}  -- active taunt lines
 local LocalizeUI              -- forward declared; defined after all UI widgets exist
+local sessionDeathCount = 0
 
 local SUPPORTED_LOCALES = {
     { code = "deDE", label = "Deutsch" },
@@ -40,9 +41,6 @@ end
 local function InitializeDB()
     if not DidYouDieDB then
         DidYouDieDB = {}
-    end
-    if not DidYouDieDB.count then
-        DidYouDieDB.count = 0
     end
     if not DidYouDieDB.unlockKey then
         DidYouDieDB.unlockKey = 1
@@ -199,21 +197,12 @@ local statText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 statText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
 
 local function UpdateMenuText()
-    local count = (DidYouDieDB and DidYouDieDB.count) or 0
-    statText:SetText((L.totalDeaths or "Deaths: ") .. "|cFFFF0000" .. count .. "|r")
+    statText:SetText((L.sessionDeaths or "Deaths: ") .. "|cFFFF0000" .. sessionDeathCount .. "|r")
 end
-
-local resetButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-resetButton:SetPoint("TOPLEFT", statText, "BOTTOMLEFT", 0, -8)
-resetButton:SetSize(160, 25)
-resetButton:SetScript("OnClick", function()
-    DidYouDieDB.count = 0
-    UpdateMenuText()
-end)
 
 -- Tastenauswahl
 local keyHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-keyHeader:SetPoint("TOPLEFT", resetButton, "BOTTOMLEFT", 0, -16)
+keyHeader:SetPoint("TOPLEFT", statText, "BOTTOMLEFT", 0, -16)
 
 local radioButtons = {}
 local keyLabels    = {}
@@ -652,7 +641,6 @@ end)
 -- -------------------------------------------------------
 LocalizeUI = function()
     title:SetText(L.panelTitle or "DidYouDie")
-    resetButton:SetText(L.resetCounter or "Reset")
     keyHeader:SetText(L.unlockKeyHeader or "")
     for i, lbl in ipairs(keyLabels) do
         lbl:SetText(L[KEY_LABEL_KEYS[i]] or "")
@@ -695,8 +683,8 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         ApplyLocale(activeCode)  -- sets L, currentTauntLines, calls LocalizeUI
 
     elseif event == "PLAYER_DEAD" then
-        DidYouDieDB.count = (DidYouDieDB.count or 0) + 1
-        deathText:SetText((L.deathMessage or "You died!") .. "  (" .. (L.deathNr or "#") .. DidYouDieDB.count .. ")")
+        sessionDeathCount = sessionDeathCount + 1
+        deathText:SetText((L.deathMessage or "You died!") .. "  (" .. (L.deathNr or "#") .. sessionDeathCount .. ")")
         local activeLines = BuildActiveLines()
         tauntText:SetText(#activeLines > 0 and activeLines[math.random(#activeLines)] or (L.noActiveLines or ""))
         InitBounce()

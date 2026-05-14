@@ -62,8 +62,7 @@ DidYouDieLocales["deDE"] = {
     },
     ui = {
         panelTitle      = "DidYouDie Einstellungen",
-        totalDeaths     = "Gesamtanzahl der Tode: ",
-        resetCounter    = "Zähler zurücksetzen",
+        sessionDeaths   = "Tode in dieser Sitzung: ",
         unlockKeyHeader = "Taste zum Freischalten des Geist-Buttons:",
         keyShift        = "Shift",
         keyCtrl         = "Strg",

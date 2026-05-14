@@ -62,8 +62,7 @@ DidYouDieLocales["enUS"] = {
     },
     ui = {
         panelTitle      = "DidYouDie Settings",
-        totalDeaths     = "Total deaths: ",
-        resetCounter    = "Reset counter",
+        sessionDeaths   = "Deaths this session: ",
         unlockKeyHeader = "Key to unlock the Release Spirit button:",
         keyShift        = "Shift",
         keyCtrl         = "Ctrl",
